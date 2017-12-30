@@ -25,7 +25,7 @@ object NonblockingPar {
   /**
     * Par 的类型与之前一样，唯一的区别是此处使用自定义的 Future
     */
-  type Par[+A] = ExecutorService ⇒ Future[A]
+  type Par[A] = ExecutorService ⇒ Future[A]
 
   /**
     * 1. run 实现中，latch.await 将阻塞调用线程，这里的阻塞是无法避免的，因为 run 要返回 A，则其必须等待该值可用后才能返回，巧妇难为无米之炊
