@@ -24,18 +24,19 @@ case class Prop(run: (MaxSize, TestCases, RNG) ⇒ Result) {
     */
   def &&(p: Prop): Prop = Prop {
     (max, n, rng) ⇒ run(max, n, rng) match {
-      case Passed ⇒ p.run(max, n, rng)
-      case f      ⇒ f
+      case Passed | Proved  ⇒ p.run(max, n, rng)
+      case failed           ⇒ failed
     }
   }
 
   /**
-    * 当两边 Prop 都失败时，需要在第二个 Prop 结果上打 tag，标注第一个 Prop 失败的提示信息
+    * 1. 当两边 Prop 都失败时，需要在第二个 Prop 结果上打 tag，标注第一个 Prop 失败的提示信息
+    * 2. || 并非区分 Passed 和 Proved 两种状态，只有失败 or 非失败
     */
   def ||(p: Prop): Prop = Prop {
     (max, n, rng) ⇒ run(max, n, rng) match {
-      case Passed             ⇒ Passed
       case Falsified(msg, _)  ⇒ p.tag(msg).run(max, n, rng)
+      case x                  ⇒ x
     }
   }
 
@@ -65,6 +66,10 @@ object Prop {
   }
 
   final case object Passed extends Result {
+    override def isFalsified: Boolean = false
+  }
+
+  final case object Proved extends Result {
     override def isFalsified: Boolean = false
   }
 
@@ -113,8 +118,17 @@ object Prop {
   def run(p: Prop, maxSize: MaxSize = 100, testCases: TestCases = 100, rng: RNG = SimpleRNG(System.currentTimeMillis)): Unit =
     p.run(maxSize, testCases, rng) match {
       case Passed             ⇒ println(s"+ OK, passed $testCases tests.")
+      case Proved             ⇒ println(s"+ OK, proved property.")
       case Falsified(msg, n)  ⇒ println(s"! Falsified after $n tests:\n $msg")
     }
+
+  /**
+    * 1. Prop 主构造函数接受一个 (MaxSize, TestCases, RNG) ⇒ Result 函数作为参数，因为只有一个参数，所以可以用 {} 替代 ()
+    * 2. 简单将 3 个参数忽略，仅根据 p 返回成功或失败
+    */
+  def check(p: ⇒ Boolean): Prop = Prop {
+    (_, _, _) ⇒ if (p) Proved else Falsified("()", 0)
+  }
 
 }
 
