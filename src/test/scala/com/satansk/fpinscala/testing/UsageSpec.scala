@@ -1,5 +1,6 @@
 package com.satansk.fpinscala.testing
 
+import com.satansk.fpinscala.state.{RNG, State}
 import org.scalatest.{Matchers, WordSpec}
 
 /**
@@ -29,6 +30,21 @@ class UsageSpec extends WordSpec with Matchers {
       val sortedProp = forAll(listOf(intGen))(xs ⇒ xs.sum == xs.sorted.sum)
 
       Prop.run(sortedProp)
+    }
+  }
+
+  /**
+    * Exercise 8.5 验证 takeWhile 的性质
+    */
+  "takeWhile" should {
+    "prove 1" in {
+      val isEven: Int ⇒ Boolean = _ % 2 == 0
+
+      val p = Prop.forAll(Gen.listOf(Gen(State(RNG.int)))) {
+        xs ⇒ xs.takeWhile(isEven).forall(isEven)
+      }
+
+      Prop.run(p)
     }
   }
 

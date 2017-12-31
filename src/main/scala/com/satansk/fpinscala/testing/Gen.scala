@@ -1,10 +1,13 @@
 package com.satansk.fpinscala.testing
 
 
+import java.util.concurrent.{ExecutorService, Executors}
+
 import com.satansk.fpinscala.state.RNG
 import com.satansk.fpinscala.state.RNG._
 import com.satansk.fpinscala.state.State
 import com.satansk.fpinscala.laziness.Stream
+import com.satansk.fpinscala.parallelism.Par.{Par, map2}
 import com.satansk.fpinscala.testing.Prop._
 
 /**
@@ -130,11 +133,64 @@ object Prop {
     (_, _, _) ⇒ if (p) Proved else Falsified("()", 0)
   }
 
+  /**
+    * 专门用于测试 Par
+    */
+  def checkPar(p: ⇒ Par[Boolean]): Prop = forAllPar(Gen.unit(()))(_ ⇒ p)
+
+  /**
+    * 将比较过程推迟到实际运行 Par 时
+    */
+  def equal[A](p1: Par[A], p2: Par[A]): Par[Boolean] = map2(p1, p2)(_ == _)
+
+  /**
+    * S 类型为 Gen[ExecutorService]，可以根据不同比重提供两种线程池：定长 & 不定长
+    */
+  val S: Gen[ExecutorService] = Gen.weighted(
+    Gen.choose(1, 4).map(Executors.newFixedThreadPool) → 0.75,
+    Gen.unit(Executors.newCachedThreadPool) → 0.25
+  )
+
+  /**
+    * 使用 S.map2(g)((_, _)) 组合两个 Gen，非常臃肿
+    */
+  def forAllPar_1[A](g: Gen[A])(f: A ⇒ Par[Boolean]): Prop =
+    forAll(S.map2(g)((_, _))) {
+      case (s, a) ⇒ f(a)(s).get
+    }
+
+  /**
+    * 使用 ** 函数，可读性大大提升
+    */
+  def forAllPar_2[A](g: Gen[A])(f: A ⇒ Par[Boolean]): Prop =
+    forAll(S ** g) {
+      case (s, a) ⇒ f(a)(s).get
+    }
+
+  /**
+    * 使用 ** 抽取器，进一步优化
+    */
+  def forAllPar[A](g: Gen[A])(f: A ⇒ Par[Boolean]): Prop =
+    forAll(S ** g) {
+      case s ** a ⇒ f(a)(s).get
+    }
+
 }
 
 case class SGen[A](forSize: Int ⇒ Gen[A])
 
 case class Gen[A](sample: State[RNG, A]) {
+
+  def map[B](f: A ⇒ B): Gen[B] = Gen(sample.map(f))
+
+  def map2_1[B, C](g: Gen[B])(f: (A, B) ⇒ C): Gen[C] =
+    Gen(sample.flatMap(a ⇒ g.sample.map(b ⇒ f(a, b))))
+
+  def map2[B, C](g: Gen[B])(f: (A, B) ⇒ C): Gen[C] =
+    Gen(sample.map2(g.sample)(f))
+
+  def **[B](g: Gen[B]): Gen[(A, B)] =
+    this.map2(g)((_, _))
 
   /**
     * Exercise 8.6 实现 flatMap 函数，然后使用 flatMap 实现更动态的 listOfN
@@ -200,4 +256,11 @@ object Gen {
     * Exercise 8.13 实现 listOf1 函数，生成非空列表
     */
   def listOf1[A](g: Gen[A]): SGen[List[A]] = SGen(n ⇒ g.listOfN(n max 1))
+}
+
+/**
+  * 定义有 unapply 方法的 ** 对象，使 ** 对象变成一个模式，可以用于模式匹配中
+  */
+object ** {
+  def unapply[A, B](p: (A, B)): Option[(A, B)] = Some(p)
 }
