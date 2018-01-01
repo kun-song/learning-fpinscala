@@ -2,6 +2,8 @@ package com.satansk.fpinscala.parsing
 
 import com.satansk.fpinscala.testing.{Gen, Prop}
 
+import scala.util.matching.Regex
+
 /**
   * Author:  satansk
   * Email:   satansk@hotmail.com
@@ -19,8 +21,6 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
     */
   def or[A](p1: Parser[A], p2: ⇒ Parser[A]): Parser[A]
 
-  def map[A, B](a: Parser[A])(f: A ⇒ B): Parser[B] = ???
-
   def succeed[A](a: A): Parser[A] = string("") map (_ ⇒ a)
 
   def slice[A](p: Parser[A]): Parser[String]
@@ -30,12 +30,12 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
     *
     * p1 执行失败时，不再执行 p2，所以 p2 应该是惰性求值
     */
-  def product[A, B](p1: Parser[A], p2: ⇒ Parser[B]): Parser[(A, B)]
+  def product_1[A, B](p1: Parser[A], p2: ⇒ Parser[B]): Parser[(A, B)]
 
   /**
     * Exercise 9.1 使用 product 实现 map2，然后用 map2 和 many 实现 many1
     */
-  def map2[A, B, C](p1: Parser[A], p2: ⇒ Parser[B])(f: (A, B) ⇒ C): Parser[C] =
+  def map2_1[A, B, C](p1: Parser[A], p2: ⇒ Parser[B])(f: (A, B) ⇒ C): Parser[C] =
     map(product(p1, p2))(x ⇒ f(x._1, x._2))
 
   def many1[A](p: Parser[A]): Parser[List[A]] =
@@ -74,6 +74,45 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
   def wrap[A](p: ⇒ Parser[A]): Parser[A]
 
   def manyViaWrap[A](p: Parser[A]): Parser[List[A]] = map2(p, wrap(many(p)))(_ :: _) or succeed(Nil)
+
+  /**
+    * 若无 flatMap，则只能实现上下文无关文法的分析，上下文相关的无法实现，例如现在有 p1, p2，需要根据 p1 的值来进行 p2 的计算，
+    * 如果没有 flatMap 则无法实现
+    */
+  def flatMap[A, B](p: Parser[A])(f: A ⇒ Parser[B]): Parser[B]
+
+  /**
+    * Exercise 9.6 使用 flatMap 以及其他组合子，实现上下文相关的分析器，实现 regex 函数
+    */
+  implicit def regex(r: Regex): Parser[String]
+
+  /**
+    * Exercise 9.7 使用 flatMap 实现 product 和 map2
+    *
+    * 原本 product 和 map2 是单独实现的，属于 primitive，但现在使用 flatMap 实现，所以 product map2 不再属于原语
+    *
+    * 两种方式：
+    *
+    * 1. flatMap + succeed
+    * 2. flatMap + map
+    */
+  def product_2[A, B](p1: Parser[A], p2: ⇒ Parser[B]): Parser[(A, B)] =
+    flatMap(p1)(a ⇒ flatMap(p2)(b ⇒ succeed(a, b)))
+
+  def map2_2[A, B, C](p1: Parser[A], p2: ⇒ Parser[B])(f: (A, B) ⇒ C): Parser[C] =
+    flatMap(p1)(a ⇒ flatMap(p2)(b ⇒ succeed(f(a, b))))
+
+  def product[A, B](p1: Parser[A], p2: ⇒ Parser[B]): Parser[(A, B)] =
+    flatMap(p1)(a ⇒ map(p2)((a, _)))
+
+  def map2[A, B, C](p1: Parser[A], p2: ⇒ Parser[B])(f: (A, B) ⇒ C): Parser[C] =
+    flatMap(p1)(a ⇒ map(p2)(f(a, _)))
+
+  /**
+    * Exercise 9.8 使用 flatMap 实现 map
+    */
+  def map[A, B](p: Parser[A])(f: A ⇒ B): Parser[B] =
+    flatMap(p)(a ⇒ succeed(f(a)))
 
   /**
     * 隐式类型转换：String => Parser[String]
