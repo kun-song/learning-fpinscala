@@ -1,5 +1,7 @@
 package com.satansk.fpinscala.parsing
 
+import java.util.regex.Pattern
+
 import com.satansk.fpinscala.testing.{Gen, Prop}
 
 import scala.util.matching.Regex
@@ -114,6 +116,95 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
   def map[A, B](p: Parser[A])(f: A ⇒ B): Parser[B] =
     flatMap(p)(a ⇒ succeed(f(a)))
 
+  def label[A](msg: String)(p: Parser[A]): Parser[A]
+
+  def scope[A](msg: String)(p: Parser[A]): Parser[A]
+
+  def attempt[A](p: Parser[A]): Parser[A]
+
+  /**
+    * 顺序排列 p1, p2，并忽略 p2 的结果，因为不关心 p2 的结果，所以使用 slice 包裹
+    */
+  def skipR[A](p1: Parser[A], p2: Parser[Any]): Parser[A] =
+    map2(p1, slice(p2))((a, _) ⇒ a)
+
+  /**
+    * 顺序排列 p1, p2，并忽略 p1 的结果，因为对 p1 结果并不关系，所以使用 slice 包裹
+    */
+  def skipL[B](p1: Parser[Any], p2: Parser[B]): Parser[B] =
+    map2(slice(p1), p2)((_, b) ⇒ b)
+
+  /**
+    * 匹配 0 或多个空白字符的 Parser
+    */
+  def whitespace: Parser[String] = "\\s*".r
+
+  /**
+    * 匹配 1 个或多个数字的 Parser
+    */
+  def digits: Parser[String] = "\\d+".r
+
+  /**
+    * 尝试执行 p，并忽略结尾的空白
+    */
+  def token[A](p: Parser[A]): Parser[A] =
+    attempt(p) <* whitespace
+
+  /**
+    * 将 p 包裹在 start 和 stop 之间
+    */
+  def surround[A](start: Parser[Any], stop: Parser[Any])(p: ⇒ Parser[A]): Parser[A] =
+    start *> p <* stop
+
+  /**
+    * 1 个或多个重复的 p，使用 p2 分隔，并忽略 p2 的结果
+    */
+  def sep1[A](p: Parser[A], p2: Parser[Any]): Parser[List[A]] =
+    map2(p, many(p2 *> p))(_ :: _)
+
+  /**
+    * 0 或多个重复的 p，使用 p2 分隔，并忽略 p2 的结果
+    */
+  def sep[A](p: Parser[A], p2: Parser[Any]): Parser[List[A]] =
+    sep1(p, p2) or succeed(Nil)
+
+  /**
+    * 无脑消耗输入，直到遇到给定字符串的 Parser
+    */
+  def thru(s: String): Parser[String] = (".*?" + Pattern.quote(s)).r
+
+  /**
+    * 非转义字符 Parser
+    */
+  def quoted: Parser[String] = (string("\"") *> thru("\"")).map(_.dropRight(1))
+
+  /**
+    * 转义 + 非转义字符 Parser
+    */
+  def escapedQuoted: Parser[String] =
+    token(quoted label "string literal")
+
+  /**
+    * Java 风格的浮点数字面值，例如：.1, -1.0, 1e9, 1E-23, etc.
+    */
+  def doubleString: Parser[String] =
+    token("[-+]?([0-9]*\\.)?[0-9]+([eE][-+]?[0-9]+)?".r)
+
+  def double: Parser[Double] =
+    doubleString map (_.toDouble) label "double literal"
+
+  /**
+    * A parser that succeeds when given empty input.
+    */
+  def eof: Parser[String] =
+    regex("\\z".r).label("unexpected trailing characters")
+
+  /**
+    * The root of the grammar, expects no further input following `p`.
+    */
+  def root[A](p: Parser[A]): Parser[A] =
+    p <* eof
+
   /**
     * 隐式类型转换：String => Parser[String]
     */
@@ -152,6 +243,21 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
     def product[A, B](p2: ⇒ Parser[B]): Parser[(A, B)] = self.product(p, p2)
     def **[A, B](p2: ⇒ Parser[B]): Parser[(A, B)] = self.product(p, p2)
 
+    def *>[B](p2: ⇒ Parser[B]): Parser[B] = self.skipL(p, p2)
+
+    def <*(p2: ⇒ Parser[Any]): Parser[A] = self.skipR(p, p2)
+
+    def label(msg: String): Parser[A] = self.label(msg)(p)
+
+    def scope(msg: String): Parser[A] = self.scope(msg)(p)
+
+    def token: Parser[A] = self.token(p)
+
+    def sep1(sep: Parser[Any]): Parser[List[A]] = self.sep1(p, sep)
+
+    def sep(sep: Parser[Any]): Parser[List[A]] = self.sep(p, sep)
+
+    def as[B](b: B): Parser[B] = self.map(self.slice(p))(_ => b)
   }
 
   object Laws {
