@@ -14,7 +14,7 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
 
   def run[A](p: Parser[A])(input: String): Either[ParseError, A]
 
-  def char(c: Char): Parser[Char] = string(c.toString).map[String, Char](_.charAt(0))
+  def char(c: Char): Parser[Char] = string(c.toString) map (_.charAt(0))
 
   /**
     * or 只有当 p1 执行失败后，才会尝试执行 p2，因此 p2 应该是惰性求值（否则，可能出现死循环，程序无法停止）
@@ -36,7 +36,7 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
     * Exercise 9.1 使用 product 实现 map2，然后用 map2 和 many 实现 many1
     */
   def map2_1[A, B, C](p1: Parser[A], p2: ⇒ Parser[B])(f: (A, B) ⇒ C): Parser[C] =
-    map(product(p1, p2))(x ⇒ f(x._1, x._2))
+    product(p1, p2) map (x ⇒ f(x._1, x._2))
 
   def many1[A](p: Parser[A]): Parser[List[A]] =
     map2(p, many(p))(_ :: _)
@@ -103,10 +103,10 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
     flatMap(p1)(a ⇒ flatMap(p2)(b ⇒ succeed(f(a, b))))
 
   def product[A, B](p1: Parser[A], p2: ⇒ Parser[B]): Parser[(A, B)] =
-    flatMap(p1)(a ⇒ map(p2)((a, _)))
+    flatMap(p1)(a ⇒ p2 map ((a, _)))
 
   def map2[A, B, C](p1: Parser[A], p2: ⇒ Parser[B])(f: (A, B) ⇒ C): Parser[C] =
-    flatMap(p1)(a ⇒ map(p2)(f(a, _)))
+    flatMap(p1)(a ⇒ p2 map (f(a, _)))
 
   /**
     * Exercise 9.8 使用 flatMap 实现 map
@@ -140,11 +140,11 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
 
     def or[B>:A](p2: Parser[B]): Parser[B] = self.or(p, p2)
 
-    def many[A]: Parser[List[A]] = self.many(p)
+    def many: Parser[List[A]] = self.many(p)
 
-    def map[A, B](f: A ⇒ B): Parser[B] = self.map(p)(f)
+    def map[B](f: A ⇒ B): Parser[B] = self.map(p)(f)
 
-    def slice[A]: Parser[String] = self.slice(p)
+    def slice: Parser[String] = self.slice(p)
 
     /**
       * a ** b 和 a product b 都被代理到 product(a, b) 上
