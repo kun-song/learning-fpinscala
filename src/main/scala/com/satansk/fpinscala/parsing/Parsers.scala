@@ -12,7 +12,7 @@ import scala.util.matching.Regex
   * Date:    17/12/31
   */
 
-trait Parsers[ParseError, Parser[+_]] { self ⇒
+trait Parsers[Parser[+_]] { self ⇒
 
   def run[A](p: Parser[A])(input: String): Either[ParseError, A]
 
@@ -116,10 +116,19 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
   def map[A, B](p: Parser[A])(f: A ⇒ B): Parser[B] =
     flatMap(p)(a ⇒ succeed(f(a)))
 
+  /**
+    * 单层错误提示信息，当 p 失败时，将 msg 作为错误消息
+    */
   def label[A](msg: String)(p: Parser[A]): Parser[A]
 
+  /**
+    * 嵌套错误提示信息，当 p 失败时，将 msg 添加到由 p 返回的错误栈上
+    */
   def scope[A](msg: String)(p: Parser[A]): Parser[A]
 
+  /**
+    * 延迟提交到 p，知道它成功为止
+    */
   def attempt[A](p: Parser[A]): Parser[A]
 
   /**
@@ -271,6 +280,25 @@ trait Parsers[ParseError, Parser[+_]] { self ⇒
       */
     def mapLaw[A](p: Parser[A])(input: Gen[String]): Prop =
       equal(p, p.map(x ⇒ x))(input)
+  }
+}
+
+/**
+  * @param stack 保存全部错误提示信息的栈
+  */
+case class ParseError(stack: List[(Location, String)])
+
+/**
+  * 根据完整输入、当前输入的偏移量计算行列值
+  *
+  * @param input  完整输入
+  * @param offset 当前输入的偏移量
+  */
+case class Location(input: String, offset: Int = 0) {
+  lazy val line = input.slice(0, offset + 1).count(_ == "\n") + 1
+  lazy val col = input.slice(0, offset + 1).lastIndexOf("\n") match {
+    case -1         ⇒ offset + 1
+    case lineStart  ⇒ offset - lineStart
   }
 }
 
