@@ -22,7 +22,7 @@ object JSON {
   final case class JArray(get: IndexedSeq[JSON]) extends JSON
   final case class JObject(get: Map[String, JSON]) extends JSON
 
-  def jsonParser[Err, Parser[+_]](P: Parsers[Err, Parser]): Parser[JSON] = {
+  def jsonParser[Err, Parser[+_]](P: Parsers[Parser]): Parser[JSON] = {
     /**
       * 隐藏 string => Parser 的隐式类型转换
       */

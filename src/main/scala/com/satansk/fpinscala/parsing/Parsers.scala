@@ -249,8 +249,8 @@ trait Parsers[Parser[+_]] { self ⇒
     /**
       * a ** b 和 a product b 都被代理到 product(a, b) 上
       */
-    def product[A, B](p2: ⇒ Parser[B]): Parser[(A, B)] = self.product(p, p2)
-    def **[A, B](p2: ⇒ Parser[B]): Parser[(A, B)] = self.product(p, p2)
+    def product[B](p2: ⇒ Parser[B]): Parser[(A, B)] = self.product(p, p2)
+    def **[B](p2: ⇒ Parser[B]): Parser[(A, B)] = self.product(p, p2)
 
     def *>[B](p2: ⇒ Parser[B]): Parser[B] = self.skipL(p, p2)
 
@@ -300,6 +300,8 @@ case class Location(input: String, offset: Int = 0) {
     case -1         ⇒ offset + 1
     case lineStart  ⇒ offset - lineStart
   }
+
+  def toError(msg: String): ParseError = ParseError(List((this, msg)))
 }
 
 object Parsers {
