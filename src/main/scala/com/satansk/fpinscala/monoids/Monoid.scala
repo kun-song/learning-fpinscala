@@ -5,6 +5,107 @@ package com.satansk.fpinscala.monoids
   * Email:   satansk@hotmail.com
   * Date:    18/1/4
   */
-class Monoid {
+
+/**
+  * monoid（幺半群），第一个纯代数结构。
+  *
+  * monoid 法则：结合律（associativity）、同一律（identity）法则被一起称为 monoid 法则
+  *
+  * 一个 monoid 由 3 部分组成：
+  *
+  * 1. 类型 A
+  * 2. 二元操作 op
+  *   （1）op 满足结合律，即 op(op(x, y), z) == op(x, op(y, z))
+  * 3. 单位元 zero
+  *   （1）zero 满足同一律，即 op(x, zero) == x 或 op(zero, x) == x
+  *
+  * 不同 monoid 实例之间，除了都满足 monoid 代数法则外，很少有其他关联。怎么理解 monoid 呢，monoid 就是一个类型 + 一些操作 + 一些法则，
+  * 是纯抽象的概念，可以对应到具体情况，但具体情况无法代表 monoid，因为 monoid 是纯粹的抽象概念（白马非🐴）。
+  */
+trait Monoid[A] {
+  def op(a1: A, a2: A): A
+  def zero: A
+}
+
+object Monoid {
+
+  /**
+    * Exercise 10.1 给出整数相加、整数相乘和布尔操作的 monoid 实例
+    */
+  val intAddition: Monoid[Int] = new Monoid[Int] {
+    def op(a1: Int, a2: Int): Int = a1 + a2
+    def zero: Int = 0
+  }
+
+  val intMultiplication: Monoid[Int] = new Monoid[Int] {
+    def op(a1: Int, a2: Int): Int = a1 * a2
+    def zero: Int = 1
+  }
+
+  val booleanOr: Monoid[Boolean] = new Monoid[Boolean] {
+    def op(a1: Boolean, a2: Boolean): Boolean = a1 || a2
+    def zero: Boolean = false
+  }
+
+  val booleanAnd: Monoid[Boolean] = new Monoid[Boolean] {
+    def op(a1: Boolean, a2: Boolean): Boolean = a1 && a2
+    def zero: Boolean = true
+  }
+
+  /**
+    * Exercise 10.2 给出能够组合 Option 值的 monoid 实例
+    *
+    * 注意：
+    *
+    * 1. optionMonoid 的 op 方法有两种实现，即 a1 orElse a2 和 a2 orElse a1，两种实现都满足 monoid 法则，但两者并不等价；
+    * 2. 这实际是个通用问题，每个 monoid 的 op 操作都有个顺序相反的同类，它们通常并不相同，但又同时满足 monoid 法则，都是合法实现；
+    * 3. 而 booleanOr 和 booleanAnd 与其顺序相反的实现完全等价，这是因为 || 和 && 操作，既满足结合律，又满足交换律（monoid 法则未要求满足交换律）；
+    */
+  def optionMonoid[A]: Monoid[Option[A]] = new Monoid[Option[A]] {
+    def op(a1: Option[A], a2: Option[A]): Option[A] = a1 orElse a2
+    def zero: Option[A] = None
+  }
+
+  /**
+    * 获取 m 的 dual Monoid
+    */
+  def dual[A](m: Monoid[A]): Monoid[A] = new Monoid[A] {
+    def op(a1: A, a2: A): A = m.op(a2, a1)
+    def zero: A = m.zero
+  }
+
+  def firstOptionM[A]: Monoid[Option[A]] = optionMonoid[A]
+
+  def lastOptionM[A]: Monoid[Option[A]] = dual(optionMonoid[A])
+
+  /**
+    * Exercise 10.3 参数、返回值类型相同的函数被称为自函数（endofunction），为 endofunction 编写一个 monoid
+    *
+    * 注意：两种函数组合方式都符合 monoid 法则，即 f compose g 和 f andThen g
+    */
+  def endoMonoid[A]: Monoid[A ⇒ A] = new Monoid[A ⇒ A] {
+    def op(a1: A ⇒ A, a2: A ⇒ A): A ⇒ A = a1 compose a2
+    def zero: A ⇒ A = a ⇒ a
+  }
+
+  /**
+    * Exercise 10.4 为 monoid 法则实现一个属性，并使用该属性测试已经编写的 monoid
+    */
+  import com.satansk.fpinscala.testing._
+  import Prop._
+
+  def monoidLaws[A](m: Monoid[A], g: Gen[A]): Prop =
+    // 结合律
+    forAll(for {
+      x ← g
+      y ← g
+      z ← g
+    } yield (x, y, z)){
+      xyz ⇒ m.op(m.op(xyz._1, xyz._2), xyz._3) == m.op(xyz._1, m.op(xyz._2, xyz._3))
+    } &&
+    // 同一律
+    forAll(g) {
+      x ⇒ m.op(x, m.zero) == x && m.op(m.zero, x) == x
+    }
 
 }
