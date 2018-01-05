@@ -108,4 +108,31 @@ object Monoid {
       x ⇒ m.op(x, m.zero) == x && m.op(m.zero, x) == x
     }
 
+  /**
+    * 使用 Monoid[A] 折叠列表 List[A]，比较通用，因为不需要知道类型 A 具体是什么。
+    *
+    * 局限：类型 A 必须存在 Monoid[A]
+    */
+  def concatenate[A](xs: List[A], m: Monoid[A]): A = xs.foldLeft(m.zero)(m.op)
+
+  /**
+    * Exercise 10.5 实现 foldMap 函数
+    *
+    * 突破 concatenate 函数的局限，即使 A 不存在 Monoid，也可实现折叠，但需要将 A 转化为存在 Monoid 的类型 B
+    */
+  def foldMap[A, B](xs: List[A], m: Monoid[B])(f: A ⇒ B): B = xs.foldLeft(m.zero)((b, a) ⇒ m.op(f(a), b))
+
+  def foldMap_2[A, B](xs: List[A], m: Monoid[B])(f: A ⇒ B): B = (xs map f).foldLeft(m.zero)(m.op)
+
+  /**
+    * Exercise 10.6 foldMap 可以实现 foldLeft/foldRight 实现，其实 foldLeft/foldRight 也可以使用 foldMap 实现
+    *
+    * f 是 (A, B) => B 或者 (B, A) => B，可以将他们处理为 A => (B => B)，即使用 Monoid[B => B] 来折叠
+    */
+  def foldLeftViaFoldMap[A, B](z: B, xs: List[A])(f: (B, A) ⇒ B): B =
+    foldMap(xs, endoMonoid: Monoid[B ⇒ B])(a ⇒ b ⇒ f(a, b))(z)
+
+  def foldRightViaFoldMap[A, B](z: B, xs: List[A])(f: (A, B) ⇒ B): B =
+    foldMap(xs, endoMonoid[B])(f.curried)(z)
+
 }
