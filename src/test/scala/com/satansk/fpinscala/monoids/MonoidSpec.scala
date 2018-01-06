@@ -41,4 +41,23 @@ class MonoidSpec extends WordSpec with Matchers {
     }
   }
 
+  "isSorted" should {
+
+    "return true on empty list" in {
+      isSorted(IndexedSeq()) shouldEqual true
+    }
+
+    "return true on list which has only one element" in {
+      isSorted(IndexedSeq(1)) shouldEqual true
+    }
+
+    "return true on sorted list" in {
+      isSorted(IndexedSeq(1, 2, 3)) shouldEqual true
+    }
+
+    "return false on unsorted list" in {
+      isSorted(IndexedSeq(0, -1, 2, 3)) shouldEqual false
+    }
+  }
+
 }

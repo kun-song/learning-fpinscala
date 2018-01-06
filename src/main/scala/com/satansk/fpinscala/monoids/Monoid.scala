@@ -130,9 +130,56 @@ object Monoid {
     * f 是 (A, B) => B 或者 (B, A) => B，可以将他们处理为 A => (B => B)，即使用 Monoid[B => B] 来折叠
     */
   def foldLeftViaFoldMap[A, B](z: B, xs: List[A])(f: (B, A) ⇒ B): B =
-    foldMap(xs, endoMonoid: Monoid[B ⇒ B])(a ⇒ b ⇒ f(a, b))(z)
+    foldMap(xs, endoMonoid: Monoid[B ⇒ B])(a ⇒ b ⇒ f(b, a))(z)
 
   def foldRightViaFoldMap[A, B](z: B, xs: List[A])(f: (A, B) ⇒ B): B =
     foldMap(xs, endoMonoid[B])(f.curried)(z)
+
+  /**
+    * Exercise 10.7 为 IndexedSeq 实现 foldMap，策略为将 IndexedSeq 分为两部分，递归处理，然后使用 monoid 合并两部分的结果
+    */
+  def foldMapV[A, B](v: IndexedSeq[A], m: Monoid[B])(f: A ⇒ B): B =
+    if (v.length <= 1) (v map f).headOption.getOrElse(m.zero)
+    else {
+      val (l, r) = v.splitAt(v.length / 2)
+      m.op(foldMapV(l, m)(f), foldMapV(r, m)(f))
+    }
+
+  /**
+    * Exercise 10.8 使用第七章的库实现并行版的 foldMap
+    *
+    * 思路：
+    * 1. 实现一个组合子 par，将 Monoid[A] 提升为 Monoid[Par[A]]
+    * 2. 使用 par 实现 parFoldMap
+    */
+  import com.satansk.fpinscala.parallelism.Par._
+
+  def par[A](m: Monoid[A]): Monoid[Par[A]] = new Monoid[Par[A]] {
+    def op(p1: Par[A], p2: Par[A]): Par[A] = map2(p1, p2)(m.op)
+    def zero: Par[A] = unit(m.zero)
+  }
+
+  def parFoldMap[A, B](v: IndexedSeq[A], m: Monoid[B])(f: A ⇒ B): Par[B] = foldMapV(v, par(m))(asyncF(f))
+
+  /**
+    * Exercise 10.9 使用 foldMap 判断给定的 IndexedSeq[Int] 是否是有序的
+    */
+
+  /**
+    * sortMonoid 保存到目前为止，最小元素、最大元素以及是否有序的 tuple
+    */
+  val sortMonoid = new Monoid[Option[(Int, Int, Boolean)]] {
+    def op(a1: Option[(Int, Int, Boolean)], a2: Option[(Int, Int, Boolean)]): Option[(Int, Int, Boolean)] =
+      (a1, a2) match {
+        case (Some((x1, y1, t1)), Some((x2, y2, t2))) ⇒
+          Some((x1 min x2, y1 max y2, t1 && t2 && y1 <= x2)) // 升序
+        case (x, None)            ⇒ x
+        case (None, x)            ⇒ x
+      }
+    def zero = None
+  }
+
+  def isSorted(xs: IndexedSeq[Int]): Boolean =
+    foldMapV(xs, sortMonoid)(i ⇒ Some(i, i, true)).forall(_._3)
 
 }
