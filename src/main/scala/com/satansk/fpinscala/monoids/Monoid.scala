@@ -182,4 +182,44 @@ object Monoid {
   def isSorted(xs: IndexedSeq[Int]): Boolean =
     foldMapV(xs, sortMonoid)(i ⇒ Some(i, i, true)).forall(_._3)
 
+  /**
+    * 以下 ADT（代数数据结构）表示单词技术的部分结果：
+    *
+    * 1. Stub 是最简单的形式，表示还没有看到任何完整的单词
+    * 2. Part 保存看到的完整单词的个数，lStub 保存左边的部分单词，rStub 保存邮编的部分单词
+    */
+  sealed trait WC
+  final case class Stub(chars: String) extends WC
+  final case class Part(lStub: String, words: Int, rStub: String) extends WC
+
+  /**
+    * Exercise 10.10 为 WC 编写 monoid 实例，并确保满足 monoid 法则
+    */
+  val wcMonoid: Monoid[WC] = new Monoid[WC] {
+    def op(a1: WC, a2: WC): WC =
+      (a1, a2) match {
+        case (Stub(s1), Stub(s2))     ⇒ Stub(s1 + s2)
+        case (Stub(s), Part(l, w, r)) ⇒ Part(s + l, w, r)
+        case (Part(l, w, r), Stub(s)) ⇒ Part(l, w, r + s)
+        case (Part(l1, w1, r1), Part(l2, w2, r2)) ⇒ Part(l1, w1 + w2 + (if ((r1 + l2).isEmpty) 0 else 1), r2)
+      }
+    def zero: WC = Stub("")
+  }
+
+  /**
+    * Exercise 10.11 使用 Monoid[WC] 实现 count 函数，递归拆分字符串，并计算各自包含的单词个数，最后再汇总
+    */
+  def count(s: String): Int = {
+    def aux(c: Char): WC =
+      if (c.isWhitespace) Part("", 0, "")
+      else Stub(c.toString)
+
+    def unstub(s: String): Int = s.length min 1
+
+    foldMapV(s.toIndexedSeq, wcMonoid)(aux) match {
+      case Stub(s)        ⇒ unstub(s)
+      case Part(l, w, r)  ⇒ unstub(l) + w + unstub(r)
+    }
+  }
+
 }
