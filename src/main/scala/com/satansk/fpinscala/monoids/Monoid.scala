@@ -1,5 +1,9 @@
 package com.satansk.fpinscala.monoids
 
+import com.satansk.fpinscala.datastructures.{Branch, Leaf, Tree}
+
+import scala.language.higherKinds
+
 /**
   * Author:  satansk
   * Email:   satansk@hotmail.com
@@ -232,6 +236,89 @@ object Monoid {
       case Stub(s)        ⇒ unstub(s)
       case Part(l, w, r)  ⇒ unstub(l) + w + unstub(r)
     }
+  }
+
+  /**
+    * 1. 很多数据结构都可以使用 foldLeft/foldMap 等函数折叠，比如 List/Tree/Stream/IndexedSeq 等，将该特性抽象为 Foldable 特质
+    * 2. 具体实现时，foldLeft/foldRight 和 foldMap 可以互相实现
+    * 3. F[_] 是高阶类型（higher-kinder type），它接受一个类型参数
+    */
+  trait Foldable[F[_]] {
+    def foldRight[A, B](xs: F[A])(z: B)(f: (A, B) ⇒ B): B = foldMap(xs)(f.curried)(endoMonoid)(z)
+    def foldLeft[A, B](xs: F[A])(z: B)(f: (B, A) ⇒ B): B = foldMap[A, B ⇒ B](xs)(a ⇒ b ⇒ f(b, a))(endoMonoid)(z)
+    def foldMap[A, B](xs: F[A])(f: A ⇒ B)(m: Monoid[B]): B = foldLeft(xs)(m.zero)((b, a) ⇒ m.op(f(a), b))
+    def concatenate[A](xs: F[A])(m: Monoid[A]): A = foldLeft(xs)(m.zero)(m.op)
+    /**
+      * Exercise 10.15 编写通过的转化方法，将 Foldable 结构转化为 List
+      */
+    def toList[A](fa: F[A]): List[A] = foldRight(fa)(Nil: List[A])(_ :: _)
+  }
+
+  /**
+    * Exercise 10.12 实现 Foldable[List]、Foldable[IndexedSeq] 和 Foldable[Stream]
+    *
+    * 注意：foldLeft/foldRight 和 foldMap 之间可以互相实现
+    */
+  object ListFoldable extends Foldable[List] {
+    override def foldRight[A, B](xs: List[A])(z: B)(f: (A, B) ⇒ B): B = xs.foldRight(z)(f)
+    override def foldLeft[A, B](xs: List[A])(z: B)(f: (B, A) ⇒ B): B = xs.foldLeft(z)(f)
+    override def foldMap[A, B](xs: List[A])(f: (A) ⇒ B)(m: Monoid[B]): B = foldRight(xs)(m.zero)((a, b) ⇒ m.op(f(a), b))
+  }
+
+  object IndexedSeqFoldable extends Foldable[IndexedSeq] {
+    override def foldRight[A, B](xs: IndexedSeq[A])(z: B)(f: (A, B) ⇒ B): B = xs.foldRight(z)(f)
+    override def foldLeft[A, B](xs: IndexedSeq[A])(z: B)(f: (B, A) ⇒ B): B = xs.foldLeft(z)(f)
+    override def foldMap[A, B](xs: IndexedSeq[A])(f: (A) ⇒ B)(m: Monoid[B]): B = foldMapV(xs, m)(f)
+  }
+
+  object StreamFoldable extends Foldable[Stream] {
+    override def foldRight[A, B](xs: Stream[A])(z: B)(f: (A, B) ⇒ B): B = xs.foldRight(z)(f)
+    override def foldLeft[A, B](xs: Stream[A])(z: B)(f: (B, A) ⇒ B): B = xs.foldLeft(z)(f)
+  }
+
+  /**
+    * Exercise 10.13 为第三章实现的二叉树实现 Foldable 实例
+    *
+    * 此处 foldMap 实现中，并未用到 m.zero，因为实际中并没有空树；这提示我们，似乎可以对比 Monoid 更小的结构进行折叠，即无 zero，只有
+    * 可结合的 op 操作，这种没有 zero 的结构被称为 semigroup
+    */
+  object TreeFoldable extends Foldable[Tree] {
+    override def foldRight[A, B](xs: Tree[A])(z: B)(f: (A, B) ⇒ B): B =
+      xs match {
+        case Leaf(v)      ⇒ f(v, z)
+        case Branch(l, r) ⇒ foldRight(r)(foldRight(l)(z)(f))(f)
+      }
+    override def foldLeft[A, B](xs: Tree[A])(z: B)(f: (B, A) ⇒ B): B =
+      xs match {
+        case Leaf(v)      ⇒ f(z, v)
+        case Branch(l, r) ⇒ foldLeft(l)(foldLeft(r)(z)(f))(f)
+      }
+    override def foldMap[A, B](xs: Tree[A])(f: (A) ⇒ B)(m: Monoid[B]): B =
+      xs match {
+        case Leaf(v)      ⇒ f(v)
+        case Branch(l, r) ⇒ m.op(foldMap(l)(f)(m), foldMap(r)(f)(m))
+      }
+  }
+
+  /**
+    * Exercise 10.14 实现 Foldable[Option] 实例
+    */
+  object OptionFoldable extends Foldable[Option] {
+    override def foldRight[A, B](xs: Option[A])(z: B)(f: (A, B) ⇒ B): B =
+      xs match {
+        case None     ⇒ z
+        case Some(a)  ⇒ f(a, z)
+      }
+    override def foldLeft[A, B](xs: Option[A])(z: B)(f: (B, A) ⇒ B): B =
+      xs match {
+        case None     ⇒ z
+        case Some(a)  ⇒ f(z, a)
+      }
+    override def foldMap[A, B](xs: Option[A])(f: (A) ⇒ B)(m: Monoid[B]): B =
+      xs match {
+        case None     ⇒ m.zero
+        case Some(a)  ⇒ f(a)
+      }
   }
 
 }
