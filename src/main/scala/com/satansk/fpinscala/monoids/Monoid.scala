@@ -183,7 +183,7 @@ object Monoid {
     foldMapV(xs, sortMonoid)(i ⇒ Some(i, i, true)).forall(_._3)
 
   /**
-    * 以下 ADT（代数数据结构）表示单词技术的部分结果：
+    * 以下 ADT（代数数据结构）表示单词计数的部分结果：
     *
     * 1. Stub 是最简单的形式，表示还没有看到任何完整的单词
     * 2. Part 保存看到的完整单词的个数，lStub 保存左边的部分单词，rStub 保存邮编的部分单词
@@ -208,14 +208,26 @@ object Monoid {
 
   /**
     * Exercise 10.11 使用 Monoid[WC] 实现 count 函数，递归拆分字符串，并计算各自包含的单词个数，最后再汇总
+    *
+    * 这体现了用 Monoid 解决问题的思路，String 对应的 stringMonoid 无法解决单词计数问题，所以我们创造了 WC 类型以及 wcMonoid，剩下的就是使用
+    * foldMap 进行转换了。
     */
   def count(s: String): Int = {
+    /**
+      * Char => WC 转换函数
+      */
     def aux(c: Char): WC =
       if (c.isWhitespace) Part("", 0, "")
       else Stub(c.toString)
 
+    /**
+      * Stub 不能含有空格，因此只能是空字符串 or 单词，unstub 对其计数，若为空字符串，则单词树为 0，否则为 1
+      */
     def unstub(s: String): Int = s.length min 1
 
+    /**
+      * foldMapV 利用 Monoid 进行计算，非常抽象
+      */
     foldMapV(s.toIndexedSeq, wcMonoid)(aux) match {
       case Stub(s)        ⇒ unstub(s)
       case Part(l, w, r)  ⇒ unstub(l) + w + unstub(r)

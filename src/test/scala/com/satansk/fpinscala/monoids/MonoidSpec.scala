@@ -60,4 +60,23 @@ class MonoidSpec extends WordSpec with Matchers {
     }
   }
 
+  "count" should {
+
+    "return 0 on empty string" in {
+      count("") shouldEqual 0
+    }
+
+    """return 1 on ("hello,")""" in {
+      count("hello,") shouldEqual 1
+    }
+
+    """return 1 on (" hello ")""" in {
+      count(" hello ") shouldEqual 1
+    }
+
+    """return 2 on (", hello world ")""" in {
+      count(", hello world ") shouldEqual 3
+    }
+  }
+
 }
