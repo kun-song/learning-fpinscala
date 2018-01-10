@@ -79,4 +79,28 @@ class MonoidSpec extends WordSpec with Matchers {
     }
   }
 
+  "bag" should {
+
+    "return Map() on empty list" in {
+      bag(IndexedSeq.empty[Int]) shouldEqual Map()
+    }
+
+    "works fine with non empty list" in {
+      bag(IndexedSeq(1, 1, 2, 2, 3)) shouldEqual Map(1 → 2, 2 → 2, 3 → 1)
+      bag(IndexedSeq("a", "a", "b")) shouldEqual Map("a" → 2, "b" → 1)
+    }
+  }
+
+  "bag_2" should {
+
+    "return Map() on empty list" in {
+      bag_2(IndexedSeq.empty[Int]) shouldEqual Map()
+    }
+
+    "works fine with non empty list" in {
+      bag_2(IndexedSeq(1, 1, 2, 2, 3)) shouldEqual Map(1 → 2, 2 → 2, 3 → 1)
+      bag_2(IndexedSeq("a", "a", "b")) shouldEqual Map("a" → 2, "b" → 1)
+    }
+  }
+
 }

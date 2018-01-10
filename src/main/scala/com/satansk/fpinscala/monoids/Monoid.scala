@@ -321,4 +321,45 @@ object Monoid {
       }
   }
 
+  /**
+    * Exercise 10.16 若类型 A 和 类型 B 是 Monoid，则类型 (A, B) 也是 Monoid，实现 Monoid[(A, B)]
+    */
+  def productMonoid[A, B](A: Monoid[A], B: Monoid[B]): Monoid[(A, B)] =
+    new Monoid[(A, B)] {
+      override def op(a1: (A, B), a2: (A, B)): (A, B) = (A.op(a1._1, a2._1), B.op(a1._2, a2._2))
+      override def zero: (A, B) = (A.zero, B.zero)
+    }
+
+  /**
+    * 示例 10.1 合并 key-value Map
+    *
+    * 只要包含的元素是 Monoid，某些数据类型就能构建成 Monoid
+    */
+  def mapMergeMonoid[K, V](m: Monoid[V]): Monoid[Map[K, V]] =
+    new Monoid[Map[K, V]] {
+      override def op(a1: Map[K, V], a2: Map[K, V]): Map[K, V] =
+        (a1.keySet ++ a2.keySet).foldRight(zero) {
+          (k, map) ⇒ map.updated(k, m.op(a1.getOrElse(k, m.zero), a2.getOrElse(k, m.zero)))
+        }
+      override def zero: Map[K, V] = Map()
+    }
+
+  /**
+    * Exercise 10.17 为返回 Monoid 的函数编写 Monoid 实例
+    */
+  def functionMonoid[A, B](m: Monoid[B]): Monoid[A ⇒ B] =
+    new Monoid[A ⇒ B] {
+      override def op(f1: A ⇒ B, f2: A ⇒ B): A ⇒ B = a ⇒ m.op(f1(a), f2(a))
+      override def zero: A ⇒ B = a ⇒ m.zero
+    }
+
+  /**
+    * Exercise 10.18 实现 bag 函数，输入一个集合，返回 Map 中，key 为集合中的元素，value 为元素出现的次数
+    */
+  def bag[A](xs: IndexedSeq[A]): Map[A, Int] =
+    foldMapV(xs, mapMergeMonoid[A, Int](intAddition))(a ⇒ Map(a → 1))
+
+  def bag_2[A](xs: IndexedSeq[A]): Map[A, Int] =
+    xs.map(a ⇒ Map(a → 1)).foldLeft(Map.empty[A, Int])(mapMergeMonoid(intAddition).op)
+
 }
