@@ -49,6 +49,51 @@ trait Monad[F[_]] extends Functor[F] {
 
   def map2[A, B, C](fa: F[A], fb: F[B])(f: (A, B) => C): F[C] =
     flatMap(fa)(a ⇒ map(fb)(b ⇒ f(a, b)))
+
+  /**
+    * Exercise 11.3 实现 sequence、traverse 函数
+    */
+  def sequence[A](lma: List[F[A]]): F[List[A]] =
+    lma.foldRight(unit(List[A]()))((fa, l) ⇒ map2(fa, l)(_ :: _))
+
+  def traverse[A, B](la: List[A])(f: A ⇒ F[B]): F[List[B]] =
+    la.foldRight(unit(List[B]()))((a, lb) ⇒ map2(f(a), lb)(_ :: _))
+
+  /**
+    * Exercise 11.4 实现 replicateM 函数
+    */
+  // 使用 sequence + List.fill 标准库函数
+  def replicateM[A](n: Int, ma: F[A]): F[List[A]] =
+    sequence(List.fill(n)(ma))
+
+  // 递归版本
+  def replicateM_2[A](n: Int, ma: F[A]): F[List[A]] =
+    if (n <= 0) unit(List[A]())
+    else map2(ma, replicateM_2(n - 1, ma))(_ :: _)
+
+  def product[A, B](ma: F[A], mb: F[B]): F[(A, B)] =
+    map2(ma, mb)((_, _))
+
+  /**
+    * Exercise 11.6 实现 filterM 函数
+    */
+  def filterM[A](xs: List[A])(f: A ⇒ F[Boolean]): F[List[A]] =
+    map(traverse(xs)(f)) {
+      _.zip(xs) match {
+        case (true, a)  ⇒ a :: Nil
+        case (false, _) ⇒ Nil
+      }
+    }
+
+  def filterM_2[A](xs: List[A])(f: A ⇒ F[Boolean]): F[List[A]] =
+    xs match {
+      case Nil      ⇒ unit(List[A]())
+      case x :: tl  ⇒ flatMap(f(x)) {
+        case true   ⇒ map2(unit(x), filterM_2(tl)(f))(_ :: _)
+        case false  ⇒ filterM_2(tl)(f)
+      }
+    }
+
 }
 
 object Monad {
@@ -80,5 +125,13 @@ object Monad {
     def flatMap[A, B](fa: List[A])(f: (A) ⇒ List[B]): List[B] = fa flatMap f
     def unit[A](a: ⇒ A): List[A] = a :: Nil
   }
+
+  /**
+    * Exercise 11.2 为 State 实现 Monad 实例
+    *
+    * 注意：State 需要两个类型参数
+    */
+  // TODO 此处 stateMonad 留待以后实现
+  val stateMonad = ???
 
 }
