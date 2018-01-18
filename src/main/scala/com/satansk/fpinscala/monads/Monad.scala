@@ -1,6 +1,5 @@
 package com.satansk.fpinscala.monads
 
-import com.satansk.fpinscala.laziness.Empty
 import com.satansk.fpinscala.parallelism.Par
 import com.satansk.fpinscala.parallelism.Par.Par
 import com.satansk.fpinscala.testing.Gen
@@ -93,6 +92,40 @@ trait Monad[F[_]] extends Functor[F] {
         case false  ⇒ filterM_2(tl)(f)
       }
     }
+
+  /**
+    * Exercise 11.7 实现 Kleisli composition 函数 compose
+    *
+    * 根据类型签名，该函数只有一种实现方式
+    */
+  def compose[A, B, C](f: A ⇒ F[B])(g: B ⇒ F[C]): A ⇒ F[C] =
+    a ⇒ flatMap(f(a))(g)
+
+  /**
+    * Exercise 11.8 使用 compose 实现 flatMap
+    *
+    * compose + unit 可以视为另一组 Monad 的最小 primitive 集合（另一组是 flatMap + unit）
+    */
+  def flatMapViaCompose[A, B](fa: F[A])(f: A ⇒ F[B]): F[B] =
+    compose((_: Unit) ⇒ fa)(f)(())
+
+  /**
+    * Exercise 11.12 使用 flatMap 实现 join
+    *
+    * 1. unit + map + join 是第三种 Monad 最小原语集
+    * 2. join 有时被称为 flatten，而 flatMap 语义为 map 然后 flatten，所以 map + join 完成可以取代 flatMap
+    */
+  def join[A](mma: F[F[A]]): F[A] =
+    flatMap(mma)(ma ⇒ ma)
+
+  /**
+    * Exercise 11.13 使用 join + map 实现 flatMap/compose
+    */
+  def flatMapViaJoin[A, B](fa: F[A])(f: A ⇒ F[B]): F[B] =
+    join(map(fa)(f))
+
+  def composeViaJoin[A, B, C](f: A ⇒ F[B])(g: B ⇒ F[C]): A ⇒ F[C] =
+    a ⇒ join(map(f(a))(g))
 
 }
 
