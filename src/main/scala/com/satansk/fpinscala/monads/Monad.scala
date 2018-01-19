@@ -2,9 +2,11 @@ package com.satansk.fpinscala.monads
 
 import com.satansk.fpinscala.parallelism.Par
 import com.satansk.fpinscala.parallelism.Par.Par
+import com.satansk.fpinscala.state.State
 import com.satansk.fpinscala.testing.Gen
 
 import scala.language.higherKinds
+import scala.language.reflectiveCalls
 
 /**
   * Author:  satansk
@@ -167,4 +169,68 @@ object Monad {
   // TODO 此处 stateMonad 留待以后实现
   val stateMonad = ???
 
+  /**
+    * 示例 11.7 为 State 创建 Monad
+    *
+    * 问题：State 类型具备 flatMap 和 unit，非常适合实现为 Monad，但是 State 需要两个类型参数，而 Monad 只能接受一个！
+    *
+    * 解决办法 1：先固定第一个类型参数，比如指定其为 Int，则 State 变成 State[Int, T]，类型参数只剩下一个啦，于是当然可以用于 Monad！
+    */
+  type intState[T] = State[Int, T]
+
+  val intStateMonad: Monad[intState] = new Monad[intState] {
+    def flatMap[A, B](fa: intState[A])(f: (A) ⇒ intState[B]): intState[B] = fa flatMap f
+    def unit[A](a: ⇒ A): intState[A] = State.unit(a)
+  }
+
+  /**
+    * 问题：如果对于每个类型 S，都需要先创建 State[S, _] 的类型别名，则世界上无数类型，能把人累死；
+    *
+    * 解决办法：使用类型 lambda
+    */
+  def StateMonad[S]: Monad[({type f[x] = State[S, x]})#f] = new Monad[({type f[x] = State[S, x]})#f] {
+    override def flatMap[A, B](fa: State[S, A])(f: (A) ⇒ State[S, B]): State[S, B] = fa flatMap f
+    override def unit[A](a: ⇒ A): State[S, A] = State.unit(a)
+  }
+
+  /**
+    * 示例 11.8 在 for 推导中获取、设置状态
+    */
+  val F = StateMonad[Int]
+
+}
+
+/**
+  * Exercise 11.17 为 Id 实现 map 和 flatMap 方法，并实现 Monad[Id]
+  */
+case class Id[A](v: A) {
+  def map[B](f: A ⇒ B): Id[B] = Id(f(v))
+  def flatMap[B](f: A ⇒ Id[B]) = f(v)
+}
+
+object Id {
+  /**
+    * 1. Monad 特质本身只有 unit 和 flatMap 是未实现的，剩余函数都已借由 unit + flatMap 实现；
+    * 2. 因此，像 Id 类型，本身只需要实现 unit 和 flatMap 函数，就能"凭空"获取大量有用的函数；
+    */
+  val idMonad: Monad[Id] = new Monad[Id] {
+    def flatMap[A, B](fa: Id[A])(f: (A) ⇒ Id[B]): Id[B] = fa flatMap f
+    def unit[A](a: ⇒ A): Id[A] = Id(a)
+  }
+}
+
+/**
+  * Exercise 11.20 为 Reader 类型实现 Monad 实例
+  */
+case class Reader[R, A](run: R ⇒ A)
+
+object Reader {
+  def readerMonad[R] = new Monad[({type f[x] = Reader[R, x]})#f] {
+    def unit[A](a: ⇒ A): Reader[R, A] = Reader(_ ⇒ a)
+    def flatMap[A, B](fa: Reader[R, A])(f: (A) ⇒ Reader[R, B]): Reader[R, B] =
+      Reader(r ⇒ {
+        val a = fa.run(r)
+        f(a).run(r)
+      })
+  }
 }
