@@ -78,13 +78,13 @@ trait Monad[F[_]] extends Functor[F] {
   /**
     * Exercise 11.6 实现 filterM 函数
     */
-  def filterM[A](xs: List[A])(f: A ⇒ F[Boolean]): F[List[A]] =
-    map(traverse(xs)(f)) {
-      _.zip(xs) match {
-        case (true, a)  ⇒ a :: Nil
-        case (false, _) ⇒ Nil
-      }
-    }
+//  def filterM[A](xs: List[A])(f: A ⇒ F[Boolean]): F[List[A]] =
+//    map(traverse(xs)(f)) {
+//      _.zip(xs) match {
+//        case (true, a)  ⇒ a :: Nil
+//        case (false, _) ⇒ Nil
+//      }
+//   }
 
   def filterM_2[A](xs: List[A])(f: A ⇒ F[Boolean]): F[List[A]] =
     xs match {
