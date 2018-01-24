@@ -69,6 +69,35 @@ trait Applicative[F[_]] extends Functor[F] {
   def map4[A, B, C, D, E](fa: F[A], fb: F[B], fc: F[C], fd: F[D])(f: (A, B, C, D) ⇒ E): F[E] =
     apply(apply(apply(apply(unit(f.curried))(fa))(fb))(fc))(fd)
 
+  /**
+    * Exercise 12.8 为 Applicative Functor 实现 product 函数
+    */
+  def product[G[_]](G: Applicative[G]): Applicative[({type f[x] = (F[x], G[x])})#f] = {
+    val self: Applicative[F] = this
+    new Applicative[({type f[x] = (F[x], G[x])})#f] {
+      // f[A] f[B] => F[C]
+      // 此处 IDEA 报错系误报
+      override def map2[A, B, C](fa: (F[A], G[A]), fb: (F[B], G[B]))(f: (A, B) ⇒ C): (F[C], G[C]) =
+        (self.map2(fa._1, fb._1)(f), G.map2(fa._2, fb._2)(f))
+
+      override def unit[A](a: ⇒ A): (F[A], G[A]) = (self.unit(a), G.unit(a))
+    }
+  }
+
+  /**
+    * Exercise 12.9 实现 compose 函数（若 F[_] 和 G[_] 是函子，则 F[G[_]] 也是函子）
+    */
+  def compose[G[_]](G: Applicative[G]): Applicative[({type f[x] = (F[G[x]])})#f] = {
+    val self: Applicative[F] = this
+    new Applicative[({type f[x] = F[G[x]]})#f] {
+      // 此处 IDEA 报错系误报
+      override def map2[A, B, C](fa: F[G[A]], fb: F[G[B]])(f: (A, B) ⇒ C): F[G[C]] =
+        self.map2(fa, fb)(G.map2(_, _)(f))
+
+      override def unit[A](a: ⇒ A): F[G[A]] = self.unit(G.unit(a))
+    }
+  }
+
 }
 
 object Applicative {
@@ -161,6 +190,7 @@ object Monad {
     override def map2[A, B, C](fa: Either[E, A], fb: Either[E, B])(f: (A, B) ⇒ C): Either[E, C] =
       (fa, fb) match {
         case (Right(a), Right(b)) ⇒ Right(f(a, b))
+        case (Right(_), Left(e))  ⇒ Left(e)
         case (Left(e), _)         ⇒ Left(e)
       }
     override def unit[A](a: ⇒ A): Either[E, A] = Right(a)
