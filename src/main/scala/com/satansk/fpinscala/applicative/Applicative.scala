@@ -98,6 +98,14 @@ trait Applicative[F[_]] extends Functor[F] {
     }
   }
 
+  /**
+    * Exercise 12.12 对 Map 而非 List 实现 sequence 函数（Map 与 List 一样，属于可遍历数据结构）
+    */
+  def sequenceMap[K, V](mkf: Map[K, F[V]]): F[Map[K, V]] =
+    mkf.foldRight(unit(Map[K,V]().empty)){
+      case ((k, fv), fmkv)  ⇒ map2(fv, fmkv)((v, mkv) ⇒ mkv + (k → v))
+    }
+
 }
 
 object Applicative {
@@ -149,6 +157,47 @@ object Applicative {
       validBirthdate(birthdate),
       validPhone(number)
     )(WebForm)
+
+}
+
+/**
+  * 每个可遍历数据结构都需要 sequence 和 traverse 函数
+  */
+trait Traverse[F[_]] {
+  def traverse[G[_]: Applicative, A, B](fa: F[A])(f: A ⇒ G[B]): G[F[B]]
+
+  def sequence[G[_]: Applicative, A](fga: F[G[A]]): G[F[A]] =
+    traverse(fga)(ga ⇒ ga)
+}
+
+object Traverse {
+
+  /**
+    * Exercise 12.13 为 List、Option 和 Tree 实现 Traverse 实例
+    */
+  val listTraverse: Traverse[List] =
+    new Traverse[List] {
+      override def traverse[G[_], A, B](fa: List[A])(f: A ⇒ G[B])(implicit G: Applicative[G]): G[List[B]] =
+        fa.foldRight(G.unit(Nil: List[B]))((a, glb) ⇒ G.map2(f(a), glb)(_ :: _))
+    }
+
+  val optionTraverse: Traverse[Option] =
+    new Traverse[Option] {
+      override def traverse[G[_], A, B](fa: Option[A])(f: A ⇒ G[B])(implicit G: Applicative[G]): G[Option[B]] =
+        fa match {
+          case Some(a)  ⇒ G.map(f(a))(Some(_))
+          case None     ⇒ G.unit(None)
+        }
+    }
+
+  case class Tree[+A](hd: A, tl: List[Tree[A]])
+
+  val treeTraverse: Traverse[Tree] =
+    new Traverse[Tree] {
+      override def traverse[G[_], A, B](fa: Tree[A])(f: A ⇒ G[B])(implicit G: Applicative[G]): G[Tree[B]] =
+        // map2(G[B], G[List[B]])((b, lb) => Tree(b, lb))
+        G.map2(f(fa.hd), listTraverse.traverse(fa.tl)(t ⇒ traverse(t)(f)))(Tree(_, _))
+    }
 
 }
 
